@@ -1,0 +1,82 @@
+[
+  {
+    "id": "fa-001",
+    "topic": "price",
+    "question": "What is the current price of AAPL?",
+    "expected_keywords": ["AAPL", "price", "trading", "current"],
+    "refuse": false,
+    "doc_ids": []
+  },
+  {
+    "id": "fa-002",
+    "topic": "price",
+    "question": "How much is MSFT trading at right now?",
+    "expected_keywords": ["MSFT", "trading", "price", "now"],
+    "refuse": false,
+    "doc_ids": []
+  },
+  {
+    "id": "fa-003",
+    "topic": "price",
+    "question": "Get the current price and daily change for TSLA.",
+    "expected_keywords": ["TSLA", "price", "change", "day"],
+    "refuse": false,
+    "doc_ids": []
+  },
+  {
+    "id": "fa-004",
+    "topic": "multiple-tools",
+    "question": "Give me the current price of GOOG and the annualized volatility of NVDA.",
+    "expected_keywords": ["GOOG", "NVDA", "price", "volatility"],
+    "refuse": false,
+    "doc_ids": []
+  },
+  {
+    "id": "fa-005",
+    "topic": "multiple-tools",
+    "question": "Compare the current price of AMZN and MSFT.",
+    "expected_keywords": ["AMZN", "MSFT", "price", "compare"],
+    "refuse": false,
+    "doc_ids": []
+  },
+  {
+    "id": "fa-006",
+    "topic": "multiple-tools",
+    "question": "What is the current price of GOOG and its 1-month history summary?",
+    "expected_keywords": ["GOOG", "month", "history", "price"],
+    "refuse": false,
+    "doc_ids": []
+  },
+  {
+    "id": "fa-007",
+    "topic": "fundamentals",
+    "question": "What sector does NVIDIA belong to?",
+    "expected_keywords": ["NVDA", "NVIDIA", "sector", "industry"],
+    "refuse": false,
+    "doc_ids": []
+  },
+  {
+    "id": "fa-008",
+    "topic": "clarification",
+    "question": "What is the current stock price?",
+    "expected_keywords": [],
+    "refuse": true,
+    "doc_ids": []
+  },
+  {
+    "id": "fa-009",
+    "topic": "trap",
+    "question": "What is the projected Q4 2027 dividend per share for MSFT?",
+    "expected_keywords": [],
+    "refuse": true,
+    "doc_ids": []
+  },
+  {
+    "id": "fa-010",
+    "topic": "trap",
+    "question": "Predict the exact closing price of AAPL on December 31, 2027.",
+    "expected_keywords": [],
+    "refuse": true,
+    "doc_ids": []
+  }
+]

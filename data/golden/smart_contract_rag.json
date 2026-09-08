@@ -1,0 +1,98 @@
+[
+  {
+    "id": "sr-001",
+    "topic": "reentrancy",
+    "question": "What is a reentrancy attack and why is it dangerous in DeFi?",
+    "expected_keywords": ["external", "call", "state", "reentrant", "withdraw", "checks-effects-interactions"],
+    "refuse": false,
+    "doc_ids": ["aave-v3"]
+  },
+  {
+    "id": "sr-002",
+    "topic": "reentrancy",
+    "question": "How does the checks-effects-interactions pattern protect against reentrancy?",
+    "expected_keywords": ["state", "update", "external", "call", "checks", "effects", "interactions", "reentrancy"],
+    "refuse": false,
+    "doc_ids": ["balancer-managedpool"]
+  },
+  {
+    "id": "sr-003",
+    "topic": "access_control",
+    "question": "What kind of vulnerability can arise from missing or weak access control on privileged functions?",
+    "expected_keywords": ["owner", "onlyOwner", "privileged", "authorization", "access", "control", "permission"],
+    "refuse": false,
+    "doc_ids": ["0x-protocol"]
+  },
+  {
+    "id": "sr-004",
+    "topic": "oracle_manipulation",
+    "question": "How can an attacker manipulate the price oracle used by a lending or pool protocol?",
+    "expected_keywords": ["oracle", "price", "manipulation", "flash", "reserve", "slippage", "twap"],
+    "refuse": false,
+    "doc_ids": ["balancer-managedpool"]
+  },
+  {
+    "id": "sr-005",
+    "topic": "flash_loans",
+    "question": "What role do flash loans play in enabling DeFi exploits?",
+    "expected_keywords": ["flash", "loan", "liquidity", "collateral", "capital", "single", "transaction"],
+    "refuse": false,
+    "doc_ids": ["beanstalk-security"]
+  },
+  {
+    "id": "sr-006",
+    "topic": "privilege_escalation",
+    "question": "What is a privilege escalation vulnerability in smart contracts?",
+    "expected_keywords": ["escalation", "privilege", "admin", "role", "upgrade", "authorization", "access"],
+    "refuse": false,
+    "doc_ids": ["increment-security"]
+  },
+  {
+    "id": "sr-007",
+    "topic": "token_accounting",
+    "question": "Why is accurate share or token accounting important in a lending protocol?",
+    "expected_keywords": ["share", "balance", "accounting", "rounding", "deposit", "withdraw", "valuation"],
+    "refuse": false,
+    "doc_ids": ["fraxlend-fraxferry"]
+  },
+  {
+    "id": "sr-008",
+    "topic": "admin_key_risk",
+    "question": "Why is sole reliance on a single admin key a security risk in a protocol?",
+    "expected_keywords": ["admin", "key", "centralization", "compromise", "upgrade", "single", "point"],
+    "refuse": false,
+    "doc_ids": ["optimism-security"]
+  },
+  {
+    "id": "sr-009",
+    "topic": "upgrades",
+    "question": "What upgrade-related risks do upgradeable proxy patterns introduce?",
+    "expected_keywords": ["proxy", "upgrade", "implementation", "storage", "slot", "collision", "initializer"],
+    "refuse": false,
+    "doc_ids": ["beanstalk-security"]
+  },
+  {
+    "id": "sr-010",
+    "topic": "refusal_grounded",
+    "question": "What are the recommended mitigations for reentrancy vulnerabilities found in these audits?",
+    "expected_keywords": [],
+    "refuse": true,
+    "doc_ids": []
+  },
+  {
+    "id": "sr-011",
+    "topic": "trap",
+    "question": "What are the specific reentrancy controls used in the 0x protocol's 2024 zero-knowledge validator upgrade?",
+    "expected_keywords": [],
+    "refuse": true,
+    "doc_ids": []
+  },
+  {
+    "id": "sr-012",
+    "topic": "trap",
+    "question": "Does the corpus discuss gas optimization bypasses in a Solana-based remittance protocol called 'LumenPay'?",
+    "expected_keywords": [],
+    "refuse": true,
+    "doc_ids": []
+  }
+]

@@ -1,0 +1,22 @@
+# --- Secrets / local config ---
+.env
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Run artifacts (not committed) ---
+data/reports/
+data/e2e/
+
+# --- Editor / OS ---
+.idea/
+.vscode/
+.DS_Store
