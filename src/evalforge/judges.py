@@ -152,8 +152,25 @@ class OllamaJudge:
     slightly malformed model response never crashes the eval. On any failure
     the deterministic scores are kept and ``error`` is populated.
 
-    Every HTTP attempt creates a *fresh* request (never a reused one) — the
-    retry lesson learned on the sibling evaluation pipelines applies here too.
+    Network hardening (measured on the live stack, see INC-004 in
+    ``docs/DEVELOPMENT_LOG.md``):
+
+    - ``timeout`` defaults to **180s** per call — a cold model load on the
+      local daemon can take well over 90s, and the subjects share the same
+      Ollama instance;
+    - every request body carries ``"keep_alive": "5m"`` so the judge model
+      stays loaded between cases instead of being evicted after each call
+      (the default keeps the model for only a few minutes, and a reload
+      between cases would add tens of seconds to every request);
+    - every HTTP attempt creates a *fresh* request + payload (never a reused
+      one) — the retry lesson from the sibling evaluation pipelines;
+    - :meth:`warm_up` optionally pre-loads the model and keeps it resident
+      before an entire rejudge run.
+
+    The endpoint resolves only **inside** the ``docker_default`` network:
+    from the host WSL the service name does not resolve, the call fails, and
+    the judge falls back to the deterministic scores with the reason recorded
+    (never a crash, never a silent zero).
     """
 
     name = "ollama"
@@ -163,8 +180,9 @@ class OllamaJudge:
         *,
         base_url: str | None = None,
         model: str | None = None,
-        timeout: float = 120.0,
+        timeout: float = 180.0,
         max_attempts: int = 2,
+        keep_alive: str = "5m",
         http_post: Callable[..., requests.Response] | None = None,
     ) -> None:
         import os
@@ -177,8 +195,45 @@ class OllamaJudge:
         self.model = model
         self.timeout = timeout
         self.max_attempts = max(max_attempts, 1)
+        #: Ollama ``keep_alive`` window: how long the model stays loaded after
+        #: a request. ``"5m"`` keeps the judge model resident between cases.
+        self.keep_alive = keep_alive
         #: Injection point for the unit tests (a fake POST keeps tests hermetic).
         self._post = http_post or requests.post
+
+    # ------------------------------------------------------------------
+    def warm_up(self, max_attempts: int | None = None) -> tuple[bool, str]:
+        """Pre-load the judge model so the first real score is not a cold load.
+
+        Sends a trivial one-token chat request with the same ``keep_alive``
+        window the scoring calls use, then returns ``(ok, error)``. Used by
+        ``evalforge rejudge`` before the per-case loop — a cold load of a 7B
+        model can take 90+s and would otherwise consume most of the first
+        case's timeout budget.
+
+        Never raises: a failed warm-up is logged and the run continues (the
+        per-case contract already falls back to deterministic scores).
+        """
+        attempts = max(max_attempts or self.max_attempts, 1)
+        last_error = ""
+        for _ in range(attempts):
+            # Fresh payload per attempt (see _call_llm for the rationale).
+            payload = {
+                "model": self.model,
+                "messages": [{"role": "user", "content": "ping"}],
+                "stream": False,
+                "keep_alive": self.keep_alive,
+                "options": {"temperature": 0.0, "num_predict": 1},
+            }
+            try:
+                response = self._post(
+                    f"{self.base_url}/api/chat", json=payload, timeout=self.timeout
+                )
+                response.raise_for_status()
+                return True, ""
+            except Exception as exc:  # network / HTTP -> retry fresh
+                last_error = f"{type(exc).__name__}: {exc}"
+        return False, last_error
 
     # ------------------------------------------------------------------
     def score(self, case: EvalCase, answer: SubjectAnswer) -> PerCaseJudge:
@@ -226,6 +281,7 @@ class OllamaJudge:
                         {"role": "user", "content": self._user_prompt(case, answer)},
                     ],
                     "stream": False,
+                    "keep_alive": self.keep_alive,
                     "options": {"temperature": 0.0, "num_predict": 256},
                 }
                 response = self._post(

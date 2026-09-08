@@ -194,6 +194,10 @@ class TestOllamaJudge:
         assert judge.base_url == DEFAULT_OLLAMA_URL
         assert judge.model == DEFAULT_OLLAMA_MODEL
         assert judge.max_attempts == 2
+        # INC-004 hardening: cold loads exceed 90s -> 180s per call, and the
+        # model stays resident between cases via keep_alive.
+        assert judge.timeout == 180.0
+        assert judge.keep_alive == "5m"
 
     def test_explicit_config(self):
         judge = OllamaJudge(base_url="http://ollama:11434/", model="qwen3:8b", http_post=lambda *a, **k: _FakeResponse())
@@ -213,6 +217,8 @@ class TestOllamaJudge:
         assert url.endswith("/api/chat")
         assert kwargs["json"]["model"] == DEFAULT_OLLAMA_MODEL
         assert kwargs["json"]["options"]["temperature"] == 0.0
+        # INC-004: every scoring call keeps the model loaded between cases.
+        assert kwargs["json"]["keep_alive"] == "5m"
 
     def test_fenced_response(self):
         post, _ = _post_factory(_FakeResponse('```json\n{"faithfulness": 5, "relevance": 4}\n```'))
@@ -293,6 +299,47 @@ class TestOllamaJudge:
         judge.score(_case(), SubjectAnswer(answer="x"))
         assert len(seen) == 3
         assert seen[0] is not seen[1]
+
+    def test_warm_up_reaches_chat_api_with_keep_alive(self):
+        post, calls = _post_factory(_FakeResponse('{"message": {"content": "pong"}}'))
+        judge = OllamaJudge(http_post=post)
+        ok, error = judge.warm_up()
+        assert ok is True
+        assert error == ""
+        assert len(calls) == 1
+        url, kwargs = calls[0]
+        assert url.endswith("/api/chat")
+        assert kwargs["json"]["model"] == DEFAULT_OLLAMA_MODEL
+        assert kwargs["json"]["keep_alive"] == "5m"
+        assert kwargs["json"]["options"]["num_predict"] == 1
+
+    def test_warm_up_retries_fresh_and_reports_failure(self):
+        post, calls = _post_factory(
+            requests.ConnectionError("cold"),
+            requests.ConnectionError("still cold"),
+        )
+        judge = OllamaJudge(http_post=post)
+        ok, error = judge.warm_up()
+        assert ok is False
+        assert "ConnectionError" in error
+        assert len(calls) == 2  # max_attempts retries, each with a fresh payload
+
+    def test_warm_up_success_after_retry(self):
+        post, calls = _post_factory(
+            requests.ConnectionError("cold"),
+            _FakeResponse('{"message": {"content": "pong"}}'),
+        )
+        judge = OllamaJudge(http_post=post)
+        ok, error = judge.warm_up()
+        assert ok is True
+        assert error == ""
+        assert len(calls) == 2
+
+    def test_warm_up_never_raises(self):
+        judge = OllamaJudge(http_post=lambda *a, **k: (_ for _ in ()).throw(TimeoutError("x")))
+        ok, error = judge.warm_up()
+        assert ok is False
+        assert "TimeoutError" in error
 
     def test_ollama_judge_name(self):
         assert OllamaJudge(http_post=lambda *a, **k: _FakeResponse()).name == "ollama"

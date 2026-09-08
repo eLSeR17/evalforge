@@ -56,6 +56,16 @@ class EvalCase:
     refuse: bool = False
     doc_ids: list[str] = field(default_factory=list)
 
+    def reference_text(self) -> str:
+        """The golden reference context: expected keywords + declared doc ids.
+
+        This is the *golden* evidence an answer is measured against. It is
+        persisted per case in the run artifact (``golden_reference``) so that
+        an artifact can be re-scored later (``rejudge``) without re-loading
+        the original dataset: question + reference + answer are all captured.
+        """
+        return " ".join([*self.expected_keywords, *self.doc_ids]).strip()
+
     def __str__(self) -> str:  # pragma: no cover - debugging aid
         flag = " (refuse)" if self.refuse else ""
         return f"{self.id}: {self.question}{flag}"
@@ -102,6 +112,13 @@ class PerCaseResult:
     metric is *not applicable* to this case (e.g. citation accuracy when the
     case declares no ``doc_ids``). ``None`` values are excluded from the
     aggregate metrics — never silently treated as 0.
+
+    The class also carries a **captured snapshot** of the run for later
+    re-scoring: the raw ``subject_answer`` text, the refusal mark, the exposed
+    sources/retrieval, and the golden contract (``golden_reference``,
+    ``expected_keywords``, ``doc_ids``, ``refuse``). ``evalforge rejudge``
+    uses this snapshot to reconstruct (question, reference, answer) and score
+    the same responses with a different judge — no subject re-run needed.
     """
 
     case_id: str
@@ -118,6 +135,21 @@ class PerCaseResult:
     hallu: bool | None
     error: str = ""
     judge_reason: str = ""
+    # -- Captured snapshot for re-scoring (rejudge) -------------------------
+    # The raw subject response and the golden contract are persisted in the
+    # JSON artifact so a later run can reconstruct (question, reference,
+    # answer) and re-score with a different judge without re-running the
+    # subject. ``subject_sources`` / ``subject_retrieved_doc_ids`` keep the
+    # deterministic fallback reproducible; ``expected_keywords`` / ``doc_ids``
+    # / ``refuse`` / ``golden_reference`` rebuild the golden case.
+    subject_answer: str = ""
+    subject_refused: bool = False
+    subject_sources: list[str] = field(default_factory=list)
+    subject_retrieved_doc_ids: list[str] = field(default_factory=list)
+    golden_reference: str = ""
+    expected_keywords: list[str] = field(default_factory=list)
+    doc_ids: list[str] = field(default_factory=list)
+    refuse: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -135,6 +167,14 @@ class PerCaseResult:
             "hallucination": self.hallu,
             "error": self.error,
             "judge_reason": self.judge_reason,
+            "subject_answer": self.subject_answer,
+            "subject_refused": self.subject_refused,
+            "subject_sources": list(self.subject_sources),
+            "subject_retrieved_doc_ids": list(self.subject_retrieved_doc_ids),
+            "golden_reference": self.golden_reference,
+            "expected_keywords": list(self.expected_keywords),
+            "doc_ids": list(self.doc_ids),
+            "refuse": self.refuse,
         }
 
 

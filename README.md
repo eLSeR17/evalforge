@@ -45,7 +45,8 @@ subjects: **`alpha-agent`** (an investment-research agent with tools) and
 # 1. Heuristic judge (no Ollama needed, CI-safe)
 python3 scripts/run_e2e.py --subject all --judge heuristic
 
-# 2. LLM-as-judge via local Ollama
+# 2. Semantic LLM-as-judge — must run inside docker_default (or use rejudge,
+#    see "Semantic judging" below); from the host this falls back to the gate
 python3 scripts/run_e2e.py --subject smart-contract-rag --judge ollama
 
 # 3. Run the CLI directly against one subject
@@ -89,28 +90,93 @@ section showing which thresholds were applied and which metrics breached:
 | Metric | Value | Threshold | Status |
 ```
 
-*Example output — replace with real Fase 2 numbers.* The `<value>` placeholders
-illustrate the report *format* only; they are not measured results.
+*Real report — run on 2026-09-08.* The four full e2e reports (both subjects ×
+heuristic gate + semantic LLM-as-judge, the latter as in-network rejudge) are
+reproduced, tables and all, in [docs/LIVE_EVAL.md](docs/LIVE_EVAL.md), with
+per-case detail and the regression-guard sections. Raw artifacts stay in
+`data/e2e/` (gitignored).
 
-**Status — Fase 2 pending.** The toolkit itself is implemented and verified by
-a deterministic unit suite (197 tests, no network/docker/Ollama). The real
-end-to-end results against the sibling subjects have **not** been executed yet;
-they will be published here when the Fase 2 e2e run is done.
+**Status — Phase 3: real e2e executed, dual judge live (Sep 2026).** The
+toolkit itself is implemented and verified by the hermetic suite (**223
+deterministic tests**, no network/docker/Ollama). On 2026-09-08 it was run
+against both sibling projects as black-box subjects in their real Docker
+containers (`alpha-agent-demo`, `scr-rag-demo`) with **both judges executed
+for real**:
 
-A FAIL verdict is not a bug — it is the regression guard doing its job: the
-report flags when a subject does not meet the configured golden thresholds on
-that run (e.g. a `context_precision` below its floor). You interpret the
-breach, fix the subject or calibrate the thresholds
-(`--threshold key=value`), and re-run.
+- the **heuristic gate** on the host (deterministic, CI-safe) — 2 runs, one
+  per subject (`eval_report_*_heuristic_*`), and
+- the **semantic LLM-as-judge** in-network (`qwen2.5-coder:7b` via
+  `http://ollama:11434` inside `docker_default`) — 2 `evalforge rejudge` runs
+  re-scoring the captured answers (`eval_report_*_ollama-in-network_*`), with
+  **zero fallbacks**: every re-judged case carries a semantic score.
 
-> For reference, the sibling `smart-contract-rag` repo (P2) publishes results
-> from **its own** eval harness (LLM-as-judge, 14 cases): `faithfulness
-> 0.6667`, `answer_relevance 0.6444`, `citation_accuracy 0.4444`,
-> `context_precision 0.1667`, `context_recall 0.5`, `answer_rate 0.75`,
-> `correct_refusal_rate 0.7857`, `hallucination_rate 0.0`. Those are P2's own
-> harness numbers — **not** evalforge output. Reproducing them from outside
-> (black-box, without importing the siblings' code) is exactly what the
-> evalforge e2e (Fase 2) will demonstrate.
+All four runs returned verdict **FAIL**, exit code 1. A FAIL here is the
+regression guard doing its job — both subjects breach several configured
+thresholds on this corpus, so the gate fires. "FAIL" means "the harness
+measures and the gate fires on real gaps", not "the harness is broken". The
+early-session host "ollama" runs whose judge never connected (INC-004) are
+closed history: the in-network rejudge flow delivered the semantic numbers —
+see [docs/DEVELOPMENT_LOG.md](docs/DEVELOPMENT_LOG.md) and the semantic
+section of [docs/LIVE_EVAL.md](docs/LIVE_EVAL.md).
+
+Aggregate metrics — one run per subject per judge, all numbers byte-for-byte
+from the artifacts in `data/e2e/`:
+
+| Metric | alpha-agent heuristic | alpha-agent LLM | RAG heuristic | RAG LLM |
+|---|---:|---:|---:|---:|
+| faithfulness | 0.0888 | 1.0000 | 0.1996 | 0.9200 |
+| answer_relevance | 0.5312 | 0.7500 | 0.4000 | 0.9200 |
+| citation_accuracy | n/a | n/a | 0.0000 | 0.0000 |
+| context_precision | n/a | n/a | 0.0729 | 0.0729 |
+| context_recall | n/a | n/a | 0.2500 | 0.2500 |
+| answer_rate | 0.8571 | 0.8571 | 0.5556 | 0.5556 |
+| correct_refusal_rate | 0.7000 | 0.7000 | 0.6667 | 0.6667 |
+| hallucination_rate | 0.5000 | 0.5000 | 0.0000 | 0.0000 |
+
+**What the run revealed** (honest reading of the numbers):
+
+- **Dual judge confirmed: the lexical proxy was the harsh one.** On both
+  subjects the semantic judge reads faithfulness far higher than the
+  containment proxy — alpha-agent 1.0000 vs 0.0888, RAG 0.9200 vs 0.1996 —
+  because a fluent answer that stays on-topic rarely contains the golden
+  reference vocabulary verbatim. The two judges measure different things and
+  agree on the final verdict (FAIL): the heuristic is the cheap, reproducible
+  CI gate; the LLM judge is the semantic layer.
+- **P1 (`alpha-agent`) — the traps are the real signal, cross-validated by
+  the LLM judge.** Both traps (`fa-009` forward-looking MSFT dividend,
+  `fa-010` AAPL price prediction) were answered in this session under
+  **both** judges → `hallucination_rate` 0.5000 in the heuristic run and in
+  the semantic rejudge: the LLM judge flags exactly the same two misses.
+  (`fa-009` flipped between answered/refused in earlier runs — the stable
+  signal is the trap class, not the individual case.)
+- **P2 (`smart-contract-rag`) — retrieval misses persist in both scoring
+  modes.** The rejudge copies the captured retrieval/citation values verbatim,
+  so `context_precision` 0.0729, `context_recall` 0.2500 and
+  `citation_accuracy` 0.0000 are identical in the heuristic run and the
+  semantic rejudge — an internal cross-validation of the measurement.
+  evalforge also reproduces from *outside* (black-box, via `docker exec`) the
+  same retrieval misses P2 documents in its own harness (`access_control`,
+  `oracle_manipulation`, `token_accounting`, `admin_key_risk`, `upgrades` →
+  p@k/recall 0.0000) and the same clean trap behavior (both refused,
+  hallucination 0.0000, under **both** judges). Side-by-side table:
+  [docs/LIVE_EVAL.md](docs/LIVE_EVAL.md) §6.
+- **Semantic scoring is not a rubber stamp.** The LLM judge docked RAG cases
+  `sr-007`/`sr-009` to 0.8000 faithfulness (missing `balance`/`rounding`, not
+  addressing upgradeable-proxy specifics) and held alpha's `answer_relevance`
+  at 0.7500 (both traps scored 0.0000). `sr-001` was excluded from the
+  rejudge — the original run timed out (subject error), so there is no
+  response to re-score: 11/12 re-judged, honestly reported.
+
+> About P2's *own* numbers: `smart-contract-rag` ships results from **its own**
+> eval harness (LLM-as-judge, 14 cases): `faithfulness 0.6667`,
+> `answer_relevance 0.6444`, `citation_accuracy 0.4444`, `context_precision
+> 0.1667`, `context_recall 0.5`, `answer_rate 0.75`, `correct_refusal_rate
+> 0.7857`, `hallucination_rate 0.0`. Those are P2's internal measurements —
+> **not** evalforge output. The value of the evalforge e2e is that the
+> *per-topic signals* behind them are now reproduced independently, black-box,
+> without importing a single line of sibling code: same misses, same refusals,
+> same clean traps (see the comparison table in
+> [docs/LIVE_EVAL.md](docs/LIVE_EVAL.md) §6).
 
 ## Architecture
 
@@ -138,7 +204,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design rationale:
 ## Stack
 
 - **Python 3.11+** — type-hinted, dataclass models, no threads
-- **pytest 8** — fully hermetic test suite (197 deterministic tests, no network/docker/Ollama)
+- **pytest 8** — fully hermetic test suite (223 deterministic tests, no network/docker/Ollama)
 - **requests** — the only runtime dependency (Ollama judge HTTP)
 - **Ollama** (local) — optional LLM-as-judge at `http://ollama:11434`
 - **Docker** — host-side demo (`docker exec` into the subjects' containers)
@@ -187,6 +253,23 @@ python3 -m evalforge.cli --subject smart-contract-rag --threshold min_context_re
 Exit codes: `0` PASS (WARN is non-fatal), `1` FAIL or usage error. Reports are
 written to `data/reports/` (markdown + JSON).
 
+**Semantic judging (in-network only).** `http://ollama:11434` resolves only
+inside the `docker_default` network, so `--judge ollama` from the host falls
+back to the deterministic gate (and says so in `judge_reason`). To re-score an
+already-captured artifact with the LLM judge — without re-running the subject —
+use `evalforge rejudge` from inside the network (this is exactly how the two
+`..._ollama-in-network_...` reports in `data/e2e/` were produced). It writes a
+NEW `eval_report_<subject>_ollama-in-network_<ts>.{md,json}` next to the source
+artifact (never overwrites), skips cases that have no captured `subject_answer`
+or a subject error (counted, with reasons), and preserves the case count:
+
+```bash
+docker run --rm --network docker_default -v "$PWD":/app -w /app python:3.12-slim \
+  sh -c 'pip install -q requests && PYTHONPATH=src python3 -m evalforge.cli rejudge \
+    --artifact data/e2e/<artifact>.json --judge ollama \
+    --golden data/golden/alpha_agent.json --model qwen2.5-coder:7b'
+```
+
 ## Adding a new subject
 
 1. Write a golden dataset under `data/golden/<name>.json`.
@@ -214,6 +297,11 @@ written to `data/reports/` (markdown + JSON).
 - **Live demo depends on the subjects' real containers and LLM** — results can
   vary with the model/tool state; deterministic behavior lives in the pytest
   suite.
+- **Semantic judging is in-network only** — `--judge ollama` must run inside
+  the `docker_default` network (`http://ollama:11434` resolves there, never on
+  the host); from the host it completes but records deterministic numbers with
+  the reason in `judge_reason`. Use `evalforge rejudge` in-network for true
+  semantic re-scoring of captured artifacts.
 - **Educational scope** — a portfolio demonstration of evaluation engineering,
   not a replacement for commercial eval platforms.
 

@@ -196,6 +196,71 @@ class TestVerdicts:
         assert len(report.cases) == 1
 
 
+class TestAnswerPersistence:
+    """INC-004 fix: the artifact persists the raw subject answer and the
+    golden contract so a later run can re-score the same responses with a
+    different judge (`evalforge rejudge`) without re-running the subject."""
+
+    def test_case_dicts_capture_subject_answer(self):
+        cases = [
+            _case("a1", keywords=["reentrancy", "guard"], doc_ids=["aave-v3"]),
+            _case("a2", keywords=["external", "call"]),
+        ]
+        answers = [
+            SubjectAnswer(
+                answer="reentrancy guard comes first",
+                sources=["aave-v3 (page 41)"],
+                retrieved_doc_ids=["aave-v3"],
+            ),
+            SubjectAnswer(answer="external call is where the risk lives"),
+        ]
+        report = run_eval(_FakeSubject(answers), cases)
+        data = report.to_dict()
+
+        assert data["cases"][0]["subject_answer"] == "reentrancy guard comes first"
+        assert data["cases"][0]["subject_sources"] == ["aave-v3 (page 41)"]
+        assert data["cases"][0]["subject_retrieved_doc_ids"] == ["aave-v3"]
+        assert data["cases"][0]["golden_reference"] == "reentrancy guard aave-v3"
+        assert data["cases"][0]["expected_keywords"] == ["reentrancy", "guard"]
+        assert data["cases"][0]["doc_ids"] == ["aave-v3"]
+        assert data["cases"][0]["refuse"] is False
+        assert data["cases"][1]["subject_answer"] == "external call is where the risk lives"
+        assert data["cases"][1]["golden_reference"] == "external call"
+
+    def test_json_artifact_roundtrip_via_tmp_path(self, tmp_path):
+        """A run written through write_report must persist subject_answer in
+        the JSON artifact (the on-disk contract `rejudge` consumes)."""
+        from evalforge.report import write_report
+
+        cases = [_case("a1", keywords=["reentrancy", "guard"])]
+        stub_answer = SubjectAnswer(answer="the reentrancy guard is the fix")
+        report = run_eval(_FakeSubject([stub_answer]), cases)
+        _md_path, json_path = write_report(report, tmp_path)
+
+        import json
+
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+        assert payload["cases"][0]["subject_answer"] == "the reentrancy guard is the fix"
+        assert payload["cases"][0]["golden_reference"] == "reentrancy guard"
+        assert payload["cases"][0]["question"] == "question a1"
+        # The scored fields remain present alongside the snapshot.
+        assert payload["cases"][0]["answer_relevance"] == 1.0
+
+    def test_subject_error_case_persists_empty_answer(self):
+        class _Boom:
+            name = "boom"
+
+            def ask(self, question):
+                raise SubjectError("crashed")
+
+        report = run_eval(_Boom(), [_case("a1", keywords=["reentrancy"])])
+        data = report.to_dict()
+        case = data["cases"][0]
+        assert case["error"].startswith("subject error:")
+        assert case["subject_answer"] == ""  # nothing to re-score later
+        assert case["golden_reference"] == "reentrancy"
+
+
 class TestErrorHandling:
     def test_subject_error_marks_case(self):
         cases = [_case("a1", keywords=["reentrancy"])]

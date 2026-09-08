@@ -9,6 +9,7 @@ consume either.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from .models import EvalReport
@@ -117,19 +118,36 @@ def render_json(report: EvalReport) -> str:
 
 
 def write_report(
-    report: EvalReport, report_dir: str | Path, *, prefix: str = "eval_report"
+    report: EvalReport,
+    report_dir: str | Path,
+    *,
+    prefix: str = "eval_report",
+    judge_label: str | None = None,
 ) -> tuple[Path, Path]:
     """Persist the markdown and JSON artifacts for *report*.
 
     Returns the ``(md_path, json_path)`` written. The filename embeds the
     subject, judge, and UTC timestamp so successive runs never collide.
+
+    ``judge_label`` overrides the judge segment of the filename without
+    changing ``report.judge`` — used by ``rejudge`` to write
+    ``..._ollama-in-network_<ts>.{md,json}`` artifacts (the semantic run is
+    Ollama, but only reachable inside the docker network). The value is
+    sanitised for filesystem safety (no path separators).
     """
     out_dir = Path(report_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = report.created_at.replace(":", "").replace("-", "").replace("T", "T")
-    base = out_dir / f"{prefix}_{report.subject}_{report.judge}_{stamp}"
+    judge_segment = report.judge if judge_label is None else judge_label
+    judge_segment = _sanitize_filename_segment(judge_segment)
+    base = out_dir / f"{prefix}_{report.subject}_{judge_segment}_{stamp}"
     md_path = base.with_suffix(".md")
     json_path = base.with_suffix(".json")
     md_path.write_text(render_markdown(report), encoding="utf-8")
     json_path.write_text(render_json(report), encoding="utf-8")
     return md_path, json_path
+
+
+def _sanitize_filename_segment(value: str) -> str:
+    """Keep a filename segment filesystem-safe (``[A-Za-z0-9._-]``)."""
+    return re.sub(r"[^A-Za-z0-9._-]+", "-", value).strip("-") or "judge"

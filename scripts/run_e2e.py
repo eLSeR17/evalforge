@@ -16,8 +16,8 @@ is invoked from *outside* (``docker exec``) by the same
   mounted at ``/app``) — created previously by the user per the sibling's
   ``docs/LIVE_DEMO.md``.
 - ``alpha-agent``: if the ``alpha-agent-demo`` container does not exist, it
-  is created on demand with the same pattern as ``scr-rag-demo`` /
-  ``python-lab``::
+  is created on demand with the same container pattern used by the sibling
+  demo containers::
 
       docker run -d --name alpha-agent-demo --network docker_default \
         -v <path-to-alpha-agent>:/repo -w /repo python:3.12-slim sleep infinity
@@ -33,6 +33,14 @@ Usage::
 
     python3 scripts/run_e2e.py --subject all --judge heuristic
     python3 scripts/run_e2e.py --subject smart-contract-rag --judge ollama
+
+Network caveat (see docs/DEVELOPMENT_LOG.md INC-004): this script runs on the
+**host**, which is outside the ``docker_default`` network — ``--judge ollama``
+cannot resolve ``http://ollama:11434`` there, so every case falls back to the
+deterministic scores with the reason recorded in ``judge_reason``. The runs
+still complete and the deterministic gate remains valid; the semantic route is
+``evalforge rejudge`` executed INSIDE a ``docker_default`` container against
+the artifact (which now persists the subject answers).
 
 Exit codes (same semantics as the CLI):
     0  PASS (WARN is non-fatal by design)
@@ -182,6 +190,17 @@ def main(argv: list[str] | None = None) -> int:
 
     judge = HeuristicJudge()
     if args.judge == "ollama":
+        # INC-004: from the host the ollama service name does not resolve; the
+        # run still completes with the documented fallback (deterministic
+        # scores + judge_reason). Do not print this as a semantic run.
+        print(
+            "[e2e] WARNING: --judge ollama on the host cannot reach "
+            "http://ollama:11434 (outside docker_default); cases will record "
+            "judge_reason and fall back to deterministic scores. For the "
+            "semantic path run `evalforge rejudge` inside the docker network "
+            "(docs/ARCHITECTURE.md).",
+            file=sys.stderr,
+        )
         judge = OllamaJudge(model=args.model or os.environ.get("OLLAMA_MODEL"))
 
     worst_exit = 0

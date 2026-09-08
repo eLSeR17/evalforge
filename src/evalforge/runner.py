@@ -125,7 +125,10 @@ def run_eval(
       configuration error, not a pass);
     - an empty/stale subject answer is always mapped to a refusal;
     - a subject exception marks the case as errored (refused=True);
-    - metrics that cannot be measured are ``None`` and excluded.
+    - metrics that cannot be measured are ``None`` and excluded;
+    - every case captures the raw ``SubjectAnswer`` snapshot + golden contract
+      (see :class:`~evalforge.models.PerCaseResult`), so the JSON artifact can
+      be re-scored later with a different judge via ``evalforge rejudge``.
     """
     if not cases:
         raise ValueError("run_eval requires at least one golden case")
@@ -164,6 +167,17 @@ def run_eval(
                 hallu=scored.hallu,
                 error=error,
                 judge_reason=scored.reasoning or scored.error,
+                # Captured snapshot: makes the artifact self-contained and
+                # re-scorable via `evalforge rejudge` without re-running the
+                # subject (see models.PerCaseResult and cli.rejudge).
+                subject_answer=answer.answer,
+                subject_refused=answer.refused,
+                subject_sources=list(answer.sources),
+                subject_retrieved_doc_ids=list(answer.retrieved_doc_ids),
+                golden_reference=case.reference_text(),
+                expected_keywords=list(case.expected_keywords),
+                doc_ids=list(case.doc_ids),
+                refuse=case.refuse,
             )
         )
 

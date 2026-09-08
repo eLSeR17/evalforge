@@ -80,9 +80,10 @@ exposes no retrieval must not be credited with perfect context recall.
 cannot see the sibling's retrieved chunk *text*; the reference-context
 containment ratio is a conservative lexical proxy ("did the answer stay inside
 the expected vocabulary + cited documents"). For semantic grounding evaluation
-use `--judge ollama` (the LLM judge sees the full question/answer/keywords/doc
-ids/sources). This is a documented trade-off of the standalone, read-only
-design.
+use the LLM judge (it sees the full question/answer/keywords/doc ids/sources)
+— from inside the `docker_default` network, or later on a captured artifact via
+the in-network `rejudge` flow (§5). This is a documented trade-off of the
+standalone, read-only design.
 
 ## 4. Subjects and the quoting contract
 
@@ -138,6 +139,25 @@ PerCaseJudge`) and produce the same seven per-case signals.
   deterministic scores are kept and `error` is populated. Each HTTP attempt
   builds a **fresh request** (never a reused one) — the retry lesson from the
   sibling evaluation pipelines.
+  - **Live-network hardening (INC-004).** Because the judge only resolves
+    inside `docker_default`, the default per-call `timeout` is **180.0s**
+    (a cold 7B model can take >90s to first token) and every scoring call
+    sends `keep_alive: "5m"` so the model stays loaded across the run's cases.
+    `warm_up()` optionally pulls the model into VRAM before the first scored
+    case (never raises; failures are reported, not thrown).
+
+**Re-scoring captured artifacts.** `evalforge.rejudge.rejudge_artifact()`
+re-scores the *captured responses* of an existing JSON artifact with a different
+judge — no subject re-run. It requires the artifact to carry the snapshot the
+runner persists since INC-004 (`subject_answer`, `subject_sources`,
+`subject_retrieved_doc_ids`, plus the golden reference). Cases without that
+snapshot, or with a recorded subject `error`, are copied **verbatim** and
+counted in `n_skipped` with the reason — rejudge never fabricates answers. The
+case count is preserved, the original artifact is never modified, and a new
+`eval_report_<subject>_<judge-label>_<ts>.{md,json}` pair is written (the CLI
+uses the `ollama-in-network` label for `--judge ollama`). `--golden` supplies
+the golden dataset when the artifact is legacy or the golden context must be
+rebuilt.
 
 ## 6. Regression guard, verdict, and exit codes
 
@@ -175,8 +195,8 @@ Guards against misuse:
    - `scr-rag-demo` must already exist (user-created per the sibling's
      `docs/LIVE_DEMO.md`); if missing it aborts with the exact creation
      command.
-   - `alpha-agent-demo` is created on demand with the same pattern as
-     `scr-rag-demo` / `python-lab` (`docker run -d --network docker_default
+   - `alpha-agent-demo` is created on demand with the same container pattern
+     used by the sibling demo containers (`docker run -d --network docker_default
      -v <repo>:/repo python:3.12-slim sleep infinity`) and its dependencies
      installed the first time.
 2. Loads the golden dataset, builds a `CliSubject` via the registry, runs the
@@ -185,8 +205,56 @@ Guards against misuse:
 ## 8. Directory layout
 
     src/evalforge/    package (models, dataset, subjects, judges, metrics,
-                      runner, report, cli)
+                      runner, report, rejudge, cli)
     tests/            hermetic pytest suite
     scripts/          run_e2e.py (host-side, docker)
     data/golden/      alpha_agent.json, smart_contract_rag.json
     docs/             this document
+
+## 9. Operational notes (live e2e, 2026-09-08)
+
+Observations from the first real e2e run against the sibling containers
+(canonical record: `docs/LIVE_EVAL.md`; raw artifacts: `data/e2e/`, gitignored).
+
+- **Subject timeout semantics.** `CliSubject` enforces a per-question
+  subprocess timeout (default `120.0s`). When it fires, the case is marked as
+  refused with `error` populated (`subject error: <name> timed out after
+  <N>s answering: ...`) and the run continues — a slow case never aborts the
+  eval and never injects fabricated content into the metrics. The timeout is a
+  per-subject **tuning zone** (`CliSubject(timeout=...)`), not a constant. In
+  the live run, case `sr-001` timed out under shared-Ollama load; the
+  remaining 11 cases completed and `hallucination_rate` stayed 0.0000.
+- **Why heuristic = CI-safe and ollama = semantic.** `HeuristicJudge` is pure
+  lexical computation: zero network, deterministic, dependency-free — that is
+  what CI runs. `OllamaJudge` adds a 0–5 semantic layer via
+  `http://ollama:11434`, which only resolves inside the `docker_default`
+  network. When the endpoint is unreachable (e.g. the runner is on the host),
+  the judge falls back to the deterministic scores and records the reason in
+  the per-case `judge_reason` field — never a crash, never a silent zero. The
+  first e2e session exercised exactly this fallback (the historic
+  alpha-agent faithfulness numbers 0.0860 / 0.0877 are both lexical-proxy
+  values over two stochastic subject runs); the second session executed the
+  semantic judge for real via in-network `rejudge` (current heuristic proxy:
+  0.0888 vs semantic 1.0000 — see `LIVE_EVAL.md` §5).
+- **Subject-error contract.** Errors are first-class signals: `error` is
+  populated on the case, the case is treated as a refusal, and the aggregate
+  metrics remain honest (no fabricated content, no aborted runs). Audit the
+  per-case `error` column before concluding from aggregate numbers.
+- **INC-004 — the semantic judge must run inside `docker_default` (RESOLVED).**
+  The first e2e session labeled two runs "ollama", but the judge never
+  connected from the host (`http://ollama:11434` resolves only inside the
+  docker network) — every number in them was the deterministic gate, with the
+  connection error recorded per case in `judge_reason`. Three changes
+  followed: (1) honest labeling everywhere; (2) the runner persists the
+  subject's captured response in every artifact so a run can be re-scored
+  later; (3) `evalforge rejudge` re-scores captured artifacts in-network
+  (`--judge ollama` default; `--model` > `$OLLAMA_MODEL` >
+  `qwen2.5-coder:7b`), writing `..._ollama-in-network_<ts>.*` artifacts with
+  warm-up + keep-alive, skipping answer-less/errored cases verbatim. **Closure
+  (2026-09-09):** the rejudge flow ran for real on the 2026-09-08 captures —
+  `eval_report_alpha-agent_ollama-in-network_20260908T232826Z` (10/10
+  re-judged) and
+  `eval_report_smart-contract-rag_ollama-in-network_20260908T232921Z`
+  (11/12; `sr-001` skipped, subject timeout in the original run), **0
+  fallbacks**. Lesson: probe judge connectivity *before* an e2e, and label
+  every number with what actually produced it.
