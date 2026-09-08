@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from evalforge.dataset import DatasetIssue, EvalDataset
+from evalforge.dataset import DatasetIssue, EvalDataset, default_golden_filename
 from evalforge.models import EvalCase
 
 _GOLDEN_DIR = Path(__file__).resolve().parent.parent / "data" / "golden"
@@ -45,6 +45,32 @@ class TestGoldenFiles:
             for case in dataset:
                 if case.refuse:
                     assert case.expected_keywords == []
+
+
+class TestDefaultGoldenFilename:
+    """Naming convention: subject kebab-case -> golden file snake_case."""
+
+    def test_kebab_case_subjects_map_to_snake_case(self):
+        assert default_golden_filename("alpha-agent") == "alpha_agent.json"
+        assert default_golden_filename("smart-contract-rag") == "smart_contract_rag.json"
+
+    def test_subject_without_dash_is_unchanged(self):
+        assert default_golden_filename("foo") == "foo.json"
+        assert default_golden_filename("sc_rag") == "sc_rag.json"
+
+    def test_never_emits_a_hyphen(self):
+        for subject in ("alpha-agent", "smart-contract-rag", "a-b-c"):
+            assert "-" not in default_golden_filename(subject)
+
+    def test_matches_the_shipped_golden_files(self):
+        # Both real demo datasets must be reachable via the convention.
+        assert (_GOLDEN_DIR / default_golden_filename("alpha-agent")).exists()
+        assert (_GOLDEN_DIR / default_golden_filename("smart-contract-rag")).exists()
+
+    def test_usable_with_a_golden_dir_path(self):
+        assert (Path("data") / "golden" / default_golden_filename("alpha-agent")) == Path(
+            "data/golden/alpha_agent.json"
+        )
 
 
 class TestValidation:

@@ -122,7 +122,6 @@ def _container_exists(name: str) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    default_golden = {name: str(_REPO_ROOT / "data" / "golden" / f"{name}.json") for name in _KNOWN_SUBJECTS}
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--subject",
@@ -136,7 +135,10 @@ def main(argv: list[str] | None = None) -> int:
         default="heuristic",
         help="Judge to use (default: heuristic — no Ollama needed).",
     )
-    parser.add_argument("--golden", default=None, help="Custom golden dataset path.")
+    parser.add_argument(
+        "--golden", default=None,
+        help="Custom golden dataset path (default: data/golden/<snake_case subject>.json).",
+    )
     parser.add_argument(
         "--model",
         default=os.environ.get("OLLAMA_MODEL"),
@@ -156,11 +158,18 @@ def main(argv: list[str] | None = None) -> int:
 
     sys.path.insert(0, str(_REPO_ROOT / "src"))
 
-    from evalforge.dataset import EvalDataset
+    from evalforge.dataset import EvalDataset, default_golden_filename
     from evalforge.judges import HeuristicJudge, OllamaJudge
     from evalforge.report import write_report
     from evalforge.runner import RegressionThresholds, run_eval
     from evalforge.subjects import build_subject
+
+    # Default golden: data/golden/<snake_case subject>.json via the shared
+    # naming convention (alpha-agent -> alpha_agent.json); --golden overrides.
+    default_golden = {
+        name: str(_REPO_ROOT / "data" / "golden" / default_golden_filename(name))
+        for name in _KNOWN_SUBJECTS
+    }
 
     subjects = list(_KNOWN_SUBJECTS) if args.subject == "all" else [args.subject]
 

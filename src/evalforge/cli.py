@@ -29,7 +29,7 @@ import os
 import sys
 from pathlib import Path
 
-from .dataset import EvalDataset
+from .dataset import EvalDataset, default_golden_filename
 from .judges import HeuristicJudge, OllamaJudge
 from .report import write_report
 from .runner import EXIT_CODE_FAIL, EXIT_CODE_PASS, RegressionThresholds, run_eval
@@ -63,7 +63,8 @@ def _parse_threshold_overrides(raw: str | None) -> dict[str, float]:
 
 
 def _default_golden(subject: str) -> str:
-    return str(Path("data") / "golden" / f"{subject}.json")
+    """Default golden path for a subject: ``data/golden/<snake_case>.json``."""
+    return str(Path("data") / "golden" / default_golden_filename(subject))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -79,7 +80,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--golden",
         default=None,
-        help="Path to the golden dataset JSON (default: data/golden/<subject>.json).",
+        help="Path to the golden dataset JSON (default: data/golden/<snake_case subject>.json).",
     )
     parser.add_argument(
         "--judge",

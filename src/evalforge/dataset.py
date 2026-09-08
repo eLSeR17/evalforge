@@ -40,6 +40,17 @@ from typing import Any, Iterator
 from .models import EvalCase
 
 
+def default_golden_filename(subject: str) -> str:
+    """Return the conventional golden dataset filename for a *subject*.
+
+    Convention: subjects are registered kebab-case (``alpha-agent``,
+    ``smart-contract-rag``) while package and data file names are snake_case,
+    so the default filename mirrors the subject with ``-`` -> ``_``:
+    ``alpha-agent`` -> ``alpha_agent.json``. ``--golden`` overrides it.
+    """
+    return f"{subject.replace('-', '_')}.json"
+
+
 @dataclass(frozen=True)
 class DatasetIssue:
     """A single schema violation, located by JSON path."""

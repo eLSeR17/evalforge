@@ -113,6 +113,17 @@ class TestParser:
             parser.parse_args([])
 
 
+class TestDefaultGolden:
+    """CLI default golden resolution follows the snake_case convention."""
+
+    def test_kebab_subject_resolves_to_snake_case_file(self):
+        assert cli._default_golden("alpha-agent") == "data/golden/alpha_agent.json"
+        assert cli._default_golden("smart-contract-rag") == "data/golden/smart_contract_rag.json"
+
+    def test_plain_subject_unchanged(self):
+        assert cli._default_golden("foo") == "data/golden/foo.json"
+
+
 class TestCliRun:
     def test_pass_exit_zero(self, tmp_path, monkeypatch, capsys):
         monkeypatch.setattr(cli, "build_subject", lambda n: _FakeSubject([_good_answer()] * 3))

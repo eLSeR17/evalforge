@@ -45,6 +45,13 @@ Generalisation note: P2 used `relevant_doc_id` (str|list) and `expect_answer`
 framing: `True` = the subject must decline). Semantic content is identical;
 naming is domain-free.
 
+**Default file naming convention.** Subject names are kebab-case and their
+golden files snake_case: by default the dataset is
+`data/golden/<subject with '-' -> '_'>.json` (e.g. `alpha-agent` ->
+`alpha_agent.json`); both the CLI and `run_e2e.py` resolve it through the pure
+`evalforge.dataset.default_golden_filename()` helper, which `--golden`
+overrides.
+
 ## 3. The eight metrics and how they generalize
 
 Port of `smart_contract_rag/src/smart_contract_rag/evals/metrics.py` with
