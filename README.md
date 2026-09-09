@@ -1,12 +1,27 @@
 # evalforge
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![CI](https://github.com/eLSeR17/evalforge/actions/workflows/ci.yml/badge.svg)](https://github.com/eLSeR17/evalforge/actions/workflows/ci.yml)
 
 > A standalone, reusable LLM evaluation toolkit: golden datasets + a dual judge
 > (deterministic heuristic for CI + LLM-as-judge via local Ollama) + a
 > regression guard with semantic exit codes. The demo evaluates the sibling
 > portfolio projects (`alpha-agent`, `smart-contract-rag`) as black-box
 > subjects — no code copied, no internals imported.
+
+## Demo
+
+An evaluation run of `alpha-agent` with the LLM judge (local Ollama, in-network)
+and the regression guard — the verdict is an honest FAIL: the guard fired on
+`hallucination_rate` (breach), which is exactly its job.
+
+![eval report](docs/media/demo-eval-report.svg)
+
+The numbers above are a real run (see `docs/LIVE_EVAL.md` for the full record,
+including the per-case table). Reproduce it with:
+
+```bash
+python3 -m evalforge.cli --subject alpha-agent --judge ollama
+```
 
 ## Problem
 
