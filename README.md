@@ -239,6 +239,14 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design rationale:
 pytest
 ```
 
+### Pre-push validation (recommended)
+Local gates mirror the CI (ruff, executable-bit/shebang checks, pytest)
+and block the push on any failure:
+
+```bash
+git config core.hooksPath scripts/hooks
+```
+
 ### Use it as a library
 
 ```python
