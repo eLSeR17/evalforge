@@ -27,8 +27,9 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Protocol
+from typing import Protocol
 
 import requests
 
@@ -42,7 +43,6 @@ from .metrics import (
     faithfulness,
     hallucination,
     is_refusal,
-    tokens,
 )
 from .models import EvalCase, SubjectAnswer
 
@@ -231,7 +231,7 @@ class OllamaJudge:
                 )
                 response.raise_for_status()
                 return True, ""
-            except Exception as exc:  # network / HTTP -> retry fresh
+            except Exception as exc:  # noqa: BLE001 — network / HTTP -> retry fresh
                 last_error = f"{type(exc).__name__}: {exc}"
         return False, last_error
 
@@ -290,7 +290,7 @@ class OllamaJudge:
                 response.raise_for_status()
                 data = response.json()
                 content = (data.get("message") or {}).get("content", "") or ""
-            except Exception as exc:  # network / HTTP / parse -> retry fresh
+            except Exception as exc:  # noqa: BLE001 — network / HTTP / parse -> retry fresh
                 last_error = f"{type(exc).__name__}: {exc}"
                 continue
 
@@ -405,11 +405,11 @@ def _fix_trailing_commas(text: str) -> str:
 
 # Re-exported for tests/API convenience.
 __all__ = [
-    "DEFAULT_OLLAMA_URL",
     "DEFAULT_OLLAMA_MODEL",
+    "DEFAULT_OLLAMA_URL",
+    "JUDGE_MAX_SCORE",
     "HeuristicJudge",
     "Judge",
-    "JUDGE_MAX_SCORE",
     "OllamaJudge",
     "PerCaseJudge",
     "extract_doc_id",

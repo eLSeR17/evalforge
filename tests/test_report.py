@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 from evalforge.dataset import EvalDataset
 from evalforge.models import EvalCase, SubjectAnswer
 from evalforge.report import render_json, render_markdown, write_report

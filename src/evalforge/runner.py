@@ -27,10 +27,10 @@ Design notes
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Protocol, Sequence
 
 from .judges import HeuristicJudge, Judge
 from .metrics import aggregate
@@ -83,7 +83,7 @@ class RegressionThresholds:
             "warn_margin": self.warn_margin,
         }
 
-    def with_overrides(self, overrides: dict[str, float] | None) -> "RegressionThresholds":
+    def with_overrides(self, overrides: dict[str, float] | None) -> RegressionThresholds:
         """Return a copy with the given threshold key overrides applied."""
         if not overrides:
             return self
@@ -143,7 +143,7 @@ def run_eval(
         except SubjectError as exc:
             answer = SubjectAnswer(answer="", refused=True)
             error = f"subject error: {exc}"
-        except Exception as exc:  # unexpected adapter failure
+        except Exception as exc:  # noqa: BLE001 — unexpected adapter failure
             answer = SubjectAnswer(answer="", refused=True)
             error = f"subject error: {type(exc).__name__}: {exc}"
         else:
@@ -215,7 +215,7 @@ def run_eval(
         thresholds=thr.as_dict(),
         metadata=run_metadata,
         exit_code=EXIT_CODE_PASS if verdict is not Verdict.FAIL else EXIT_CODE_FAIL,
-        created_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        created_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     )
 
 

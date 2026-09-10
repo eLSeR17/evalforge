@@ -1,0 +1,65 @@
+name: 'EvalForge Regression Guard'
+description: >-
+  Run the EvalForge regression guard against a subject and gate the build on
+  its semantic exit codes: 0 = PASS/WARN (non-fatal), 1 = FAIL (fails the
+  job). The report directory is uploaded as a workflow artifact.
+inputs:
+  subject:
+    description: >-
+      Subject to evaluate — must exist in src/evalforge/subjects.py
+      (e.g. alpha-agent, smart-contract-rag).
+    required: true
+  golden:
+    description: >-
+      Path to the golden dataset JSON (relative to the repo root).
+      Default: data/golden/<snake_case subject>.json
+    required: false
+  judge:
+    description: >-
+      Judge to use: heuristic (deterministic, CI-safe; default) or ollama
+      (LLM-as-judge — only meaningful where OLLAMA_URL is reachable; falls
+      back to the heuristic gate otherwise).
+    required: false
+    default: 'heuristic'
+  model:
+    description: 'Ollama judge model (used only when judge=ollama).'
+    required: false
+  thresholds:
+    description: >-
+      Comma-separated metric=value threshold overrides, e.g.
+      hallucination_rate=0.1,citation_accuracy=0.8. Also accepts
+      EVALFORGE_THRESHOLD env var.
+    required: false
+    default: ''
+  report-dir:
+    description: 'Directory where report artifacts are written and uploaded.'
+    required: false
+    default: 'data/reports'
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install EvalForge
+      shell: bash
+      run: python -m pip install --upgrade pip && pip install -e '.[dev]'
+
+    - name: Run regression guard
+      shell: bash
+      env:
+        EVALFORGE_THRESHOLD: ${{ inputs.thresholds }}
+      run: |
+        ARGS=(--subject "${{ inputs.subject }}" --judge "${{ inputs.judge }}")
+        if [ -n "${{ inputs.golden }}" ]; then ARGS+=(--golden "${{ inputs.golden }}"); fi
+        if [ -n "${{ inputs.model }}" ]; then ARGS+=(--model "${{ inputs.model }}"); fi
+        if [ -n "${{ inputs.report-dir }}" ]; then ARGS+=(--report-dir "${{ inputs.report-dir }}"); fi
+        evalforge "${ARGS[@]}"
+
+    - name: Upload report artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: evalforge-report-${{ inputs.subject }}
+        path: ${{ inputs.report-dir }}
+        if-no-files-found: warn

@@ -204,6 +204,32 @@ byte-for-byte from the `..._ollama-in-network_...` artifacts.
 
 ---
 
+## 3b. Phase C — CI integration contract, reusable Action, first full lint (2026-09-10)
+
+- **`docs/CI_INTEGRATION.md`**: documents the exit-code contract (0 = PASS and
+  WARN non-fatal, 1 = FAIL or usage error), threshold overrides
+  (`EVALFORGE_THRESHOLD` env or repeatable `--threshold KEY=VALUE`), native
+  workflow wiring, and the reusable-Action usage with the **Ollama-judge
+  fallback semantics in cloud CI** (no reachable Ollama → deterministic gate,
+  by design; real LLM-as-judge runs stay on the docker network, see
+  `docs/LIVE_EVAL.md`).
+- **`action.yml`** (composite Action): installs EvalForge (`pip install -e
+  .[dev]`), runs the guard with `subject`/`golden`/`judge`/`model`/
+  `thresholds`/`report-dir` inputs, uploads report artifacts — inherits the
+  same exit-code gate.
+- **CI hardening**: added a `lint` job (`ruff==0.16.7`, `ruff check src tests
+  scripts`) and a `security` job (`pip-audit` on the installed env +
+  `gitleaks-action` secret scan), and a **harness smoke-test step** in the
+  test job that runs the guard end-to-end against both local subjects with the
+  deterministic judge. The smoke test *reports, not propagates*, its exit
+  codes: black-box subjects are unreachable from a cloud runner so FAIL (1)
+  is expected; the hermetic suite stays the real canary.
+- **First full ruff pass over the repo**: 39 findings fixed (import sorting,
+  unused imports, `TypeError` for invalid-type raises in `dataset.py`/
+  `cli.py`, blind-except `# noqa` with justification, tests modernised:
+  attribute-error assertion for the frozen `EvalCase`, `min()` over
+  `sorted()[0]`). Suite unchanged: **223 hermetic tests pass**, ruff clean.
+
 ## 4. Security & privacy notes
 
 | Item | Decision | Why |

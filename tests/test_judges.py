@@ -21,14 +21,14 @@ from evalforge.models import EvalCase, SubjectAnswer
 
 
 def _case(**overrides) -> EvalCase:
-    values = dict(
-        id="c1",
-        topic="reentrancy",
-        question="What is a reentrancy attack?",
-        expected_keywords=["reentrancy", "guard"],
-        refuse=False,
-        doc_ids=["aave-v3"],
-    )
+    values = {
+        "id": "c1",
+        "topic": "reentrancy",
+        "question": "What is a reentrancy attack?",
+        "expected_keywords": ["reentrancy", "guard"],
+        "refuse": False,
+        "doc_ids": ["aave-v3"],
+    }
     values.update(overrides)
     return EvalCase(**values)
 

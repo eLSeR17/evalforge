@@ -33,7 +33,7 @@ class TestEvalCase:
 
     def test_immutable(self):
         case = EvalCase(id="c1", topic="t", question="q")
-        with pytest.raises(Exception):
+        with pytest.raises(AttributeError):  # dataclasses.FrozenInstanceError
             case.question = "changed"  # type: ignore[misc]
 
     def test_str(self):

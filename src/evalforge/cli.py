@@ -38,7 +38,7 @@ from pathlib import Path
 from .dataset import EvalDataset, default_golden_filename
 from .judges import HeuristicJudge, OllamaJudge
 from .report import write_report
-from .runner import EXIT_CODE_FAIL, EXIT_CODE_PASS, RegressionThresholds, run_eval
+from .runner import EXIT_CODE_FAIL, RegressionThresholds, run_eval
 from .subjects import SUBJECTS, build_subject
 
 _DEFAULT_REPORT_DIR = "data/reports"
@@ -184,7 +184,7 @@ def _main_rejudge(argv: list[str]) -> int:
         with artifact_path.open("r", encoding="utf-8") as fh:
             artifact = json.load(fh)
         if not isinstance(artifact, dict) or not isinstance(artifact.get("cases"), list):
-            raise ValueError(f"{artifact_path} is not an evalforge report JSON")
+            raise TypeError(f"{artifact_path} is not an evalforge report JSON")
 
         golden_cases = None
         if args.golden:

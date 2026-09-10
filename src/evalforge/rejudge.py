@@ -31,12 +31,12 @@ self-contained.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Iterable, Mapping
+from datetime import UTC, datetime
 
 from .judges import Judge, PerCaseJudge
-from .metrics import aggregate, is_refusal
+from .metrics import aggregate
 from .models import EvalCase, EvalReport, PerCaseResult, SubjectAnswer
 from .runner import (
     EXIT_CODE_FAIL,
@@ -275,7 +275,7 @@ def rejudge_artifact(
         thresholds=thr.as_dict(),
         metadata=run_metadata,
         exit_code=EXIT_CODE_PASS if verdict is not Verdict.FAIL else EXIT_CODE_FAIL,
-        created_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        created_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     )
     return RejudgeOutcome(
         report=report,

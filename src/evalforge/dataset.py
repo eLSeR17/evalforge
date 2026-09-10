@@ -33,9 +33,10 @@ schema can evolve without breaking older datasets.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from .models import EvalCase
 
@@ -82,7 +83,7 @@ class EvalDataset:
 
     # ------------------------------------------------------------------
     @classmethod
-    def from_json(cls, path: str | Path) -> "EvalDataset":
+    def from_json(cls, path: str | Path) -> EvalDataset:
         """Load and validate a golden dataset from a JSON file.
 
         Raises ``FileNotFoundError`` for a missing file, ``ValueError`` for
@@ -98,7 +99,7 @@ class EvalDataset:
             raise ValueError(f"Invalid JSON in golden dataset {p}: {exc}") from exc
 
         if not isinstance(raw, list):
-            raise ValueError("Golden dataset JSON must be a list of case objects.")
+            raise TypeError("Golden dataset JSON must be a list of case objects.")
 
         cases = [_case_from_dict(i, entry) for i, entry in enumerate(raw)]
         dataset = cls(cases=cases, source=str(p))
@@ -108,7 +109,7 @@ class EvalDataset:
         return dataset
 
     @classmethod
-    def from_cases(cls, cases: list[EvalCase] | list[dict]) -> "EvalDataset":
+    def from_cases(cls, cases: list[EvalCase] | list[dict]) -> EvalDataset:
         """Build a dataset from in-memory cases or plain dicts (tests)."""
         if cases and isinstance(cases[0], dict):
             return cls(cases=[_case_from_dict(i, c) for i, c in enumerate(cases)])
@@ -144,7 +145,7 @@ class EvalDataset:
 def _case_from_dict(index: int, entry: Any) -> EvalCase:
     """Coerce one raw dict entry into an ``EvalCase`` (types validated later)."""
     if not isinstance(entry, dict):
-        raise ValueError(f"cases[{index}] must be an object, got {type(entry).__name__}")
+        raise TypeError(f"cases[{index}] must be an object, got {type(entry).__name__}")
     return EvalCase(
         id=str(entry.get("id", "")),
         topic=str(entry.get("topic", "")),

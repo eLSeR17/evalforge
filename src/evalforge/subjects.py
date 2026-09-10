@@ -30,8 +30,9 @@ from __future__ import annotations
 import base64
 import re
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, Protocol
+from typing import Protocol
 
 from .models import SubjectAnswer
 

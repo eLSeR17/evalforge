@@ -156,13 +156,13 @@ class TestFromJson:
     def test_non_list_raises(self, tmp_path):
         path = tmp_path / "obj.json"
         path.write_text('{"id": "c1"}', encoding="utf-8")
-        with pytest.raises(ValueError, match="must be a list"):
+        with pytest.raises(TypeError, match="must be a list"):
             EvalDataset.from_json(path)
 
     def test_entry_not_dict_raises(self, tmp_path):
         path = tmp_path / "scalar.json"
         path.write_text('[42]', encoding="utf-8")
-        with pytest.raises(ValueError, match="must be an object"):
+        with pytest.raises(TypeError, match="must be an object"):
             EvalDataset.from_json(path)
 
     def test_schema_violation_raises_with_paths(self, tmp_path):

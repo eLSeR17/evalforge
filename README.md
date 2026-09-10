@@ -285,6 +285,26 @@ docker run --rm --network docker_default -v "$PWD":/app -w /app python:3.12-slim
     --golden data/golden/alpha_agent.json --model qwen2.5-coder:7b'
 ```
 
+## CI integration
+
+The regression guard is a **plain command with semantic exit codes**
+(`0` PASS/WARN non-fatal, `1` FAIL), so it slots into any pipeline:
+
+```yaml
+- name: Regression guard
+  run: |
+    pip install -e '.[dev]'
+    evalforge --subject smart_contract_rag --judge heuristic
+  # exit 1 fails the job; 0 passes (WARN still writes the report for review)
+```
+
+Threshold overrides via `EVALFORGE_THRESHOLD` (env) or `--threshold
+metric=value` (CLI, highest precedence). EvalForge also ships a **reusable
+GitHub Action** (`action.yml`) that installs, runs and uploads the report
+artifacts — full contract and wiring examples, including the Ollama-judge
+fallback behaviour in cloud CI:
+[`docs/CI_INTEGRATION.md`](docs/CI_INTEGRATION.md).
+
 ## Adding a new subject
 
 1. Write a golden dataset under `data/golden/<name>.json`.

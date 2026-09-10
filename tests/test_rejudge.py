@@ -163,7 +163,7 @@ def _make_artifact(tmp_path, *, with_error: bool = False):
 
 class TestRejudgeModule:
     def test_rescores_all_cases_and_preserves_count(self, tmp_path):
-        json_path, artifact, cases, answers = _make_artifact(tmp_path)
+        json_path, artifact, _, _ = _make_artifact(tmp_path)
         original_text = json_path.read_text(encoding="utf-8")
 
         judge = _StubJudge(faith=1.0, rel=1.0, reasoning="semantic stub")
@@ -348,9 +348,11 @@ class TestRejudgeCli:
         err = capsys.readouterr().err
         assert "re-scored 0 of 2 cases (2 skipped" in err
         assert "no subject_answer" in err
-        new_payload = json.loads(
-            sorted(tmp_path.glob("eval_report_stub_ollama-in-network_*.json"))[0].read_text(encoding="utf-8")
+        report = min(
+            tmp_path.glob("eval_report_stub_ollama-in-network_*.json"),
+            key=lambda p: p.name,
         )
+        new_payload = json.loads(report.read_text(encoding="utf-8"))
         assert new_payload["n_cases"] == 2
 
     def test_no_warm_up_flag_skips_warm_up(self, tmp_path, monkeypatch):

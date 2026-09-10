@@ -34,7 +34,7 @@ so the metrics are dependency-free, deterministic, and fully reproducible.
 from __future__ import annotations
 
 import re
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 # Stopwords are ignored for faithfulness: they are shared by every sentence
 # and would inflate the containment ratio without adding evidence signal.

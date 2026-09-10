@@ -34,3 +34,57 @@ jobs:
       # docker_default network, and its per-case results are stochastic by
       # nature. CI runs only the 223 hermetic tests: no network, no Docker,
       # no Ollama, no secrets. The e2e is documented in docs/LIVE_EVAL.md.
+
+      - name: Regression guard (self-check — harness smoke test)
+        run: |
+          # Exercises the full path dataset -> subject -> judge -> report ->
+          # exit codes end-to-end inside CI. The gate's exit code is
+          # *reported, not propagated*: the subjects are black-box demos that
+          # are unreachable from a cloud runner, so FAIL (1) is expected. The
+          # hermetic unit suite is the real canary; this step proves the
+          # harness itself works in a fresh environment.
+          set +e
+          evalforge --subject alpha-agent --judge heuristic --report-dir /tmp/efg-ci >/dev/null 2>&1; code_alpha=$?
+          evalforge --subject smart-contract-rag --judge heuristic --report-dir /tmp/efg-ci >/dev/null 2>&1; code_rag=$?
+          set -e
+          artifacts=$(ls /tmp/efg-ci | wc -l)
+          echo "guard exit codes: alpha-agent=${code_alpha} smart-contract-rag=${code_rag} (0=PASS/WARN,1=FAIL)"
+          echo "report artifacts written: ${artifacts}"
+          test "${artifacts}" -ge 4
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff==0.16.7
+
+      - name: Lint with ruff
+        run: ruff check src tests scripts
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Scan dependencies for known vulnerabilities
+        run: |
+          pip install pip-audit
+          pip install -e .[dev]
+          pip-audit
+
+      - name: Scan for leaked secrets (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
