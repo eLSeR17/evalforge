@@ -49,12 +49,20 @@ runs:
     - name: Run regression guard
       shell: bash
       env:
+        # Inputs flow through env vars (GitHub-recommended for composite actions):
+        # direct ${{ }} interpolation inside run scripts is an expression-injection
+        # vector, and env passthrough keeps quoting safe for arbitrary values.
         EVALFORGE_THRESHOLD: ${{ inputs.thresholds }}
+        EFG_SUBJECT: ${{ inputs.subject }}
+        EFG_GOLDEN: ${{ inputs.golden }}
+        EFG_JUDGE: ${{ inputs.judge }}
+        EFG_MODEL: ${{ inputs.model }}
+        EFG_REPORT_DIR: ${{ inputs.report-dir }}
       run: |
-        ARGS=(--subject "${{ inputs.subject }}" --judge "${{ inputs.judge }}")
-        if [ -n "${{ inputs.golden }}" ]; then ARGS+=(--golden "${{ inputs.golden }}"); fi
-        if [ -n "${{ inputs.model }}" ]; then ARGS+=(--model "${{ inputs.model }}"); fi
-        if [ -n "${{ inputs.report-dir }}" ]; then ARGS+=(--report-dir "${{ inputs.report-dir }}"); fi
+        ARGS=(--subject "$EFG_SUBJECT" --judge "$EFG_JUDGE")
+        if [ -n "$EFG_GOLDEN" ]; then ARGS+=(--golden "$EFG_GOLDEN"); fi
+        if [ -n "$EFG_MODEL" ]; then ARGS+=(--model "$EFG_MODEL"); fi
+        if [ -n "$EFG_REPORT_DIR" ]; then ARGS+=(--report-dir "$EFG_REPORT_DIR"); fi
         evalforge "${ARGS[@]}"
 
     - name: Upload report artifacts
